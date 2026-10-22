@@ -38,3 +38,20 @@ The example expiry is illustrative; set `expiresAt` to 24 hours after the actual
 - `helpkaro23-logo.png`: logo
 
 Keep all files together at the repository root. On GitHub Pages, commit changes and wait for deployment. The website does not accept or distribute donations.
+
+
+## Pay / Support button
+Each approved request card now has a **Pay / Support** button that opens `payment.html`.
+Payments are intentionally disabled unless a specific approved request has a verified HTTPS `paymentUrl`.
+Add an `id` and `paymentUrl` to that request in `requests.json` only after verifying the intended recipient and payment destination. Example fields:
+
+```json
+{
+  "id": "HK23-001",
+  "approved": true,
+  "amount": 2000,
+  "paymentUrl": "https://your-verified-payment-provider-link.example"
+}
+```
+
+Replace the example URL with a real HTTPS payment link owned by the intended recipient or a legitimate provider. The site itself does not collect or hold money. Do not publish a link until you have checked the recipient and the applicable provider/legal requirements.

@@ -59,6 +59,14 @@ function renderRequests(filter) {
       bottom
     );
 
+    const payLink = makeText("a", "btn primary request-pay-btn", "Pay / Support →");
+    const requestId = String(request.id || request.requestId || "");
+    const paymentParams = new URLSearchParams();
+    if (requestId) paymentParams.set("requestId", requestId);
+    paymentParams.set("amount", String(Number(request.amount)));
+    payLink.href = `payment.html?${paymentParams.toString()}`;
+    card.append(payLink);
+
     if (request.publicContactUrl) {
       try {
         const url = new URL(request.publicContactUrl);

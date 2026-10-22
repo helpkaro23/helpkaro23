@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Review support details for a HelpKaro23 request.">
+  <title>Payment / Support — HelpKaro23</title>
+  <link rel="icon" href="helpkaro23-logo.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><img src="helpkaro23-logo.png" alt="HelpKaro23 logo"><span>HelpKaro<span class="mint">23</span><small>INDIA</small></span></a>
+  <a class="nav-button" href="index.html#requests">Back to requests</a>
+</header>
+<main class="terms-page">
+  <section class="terms-wrap payment-wrap">
+    <a class="back-link" href="index.html#requests">← Back to requests</a>
+    <span class="eyebrow">HELPKARO23 · SUPPORT DETAILS</span>
+    <h1>Payment / support</h1>
+    <p>You're viewing the support page for a public request. Check the request details carefully before making any payment.</p>
+    <div class="payment-summary">
+      <div><span class="payment-label">Request ID</span><strong id="payment-request-id">Not provided</strong></div>
+      <div><span class="payment-label">Requested amount</span><strong id="payment-amount">Not provided</strong></div>
+    </div>
+    <div class="notice payment-notice">
+      <span class="notice-icon">!</span>
+      <div><strong id="payment-status-title">Online payments are not enabled</strong>
+      <p id="payment-status">HelpKaro23 does not collect, hold, or distribute donations. No payment gateway is configured on this page yet. Please do not send money to the website owner.</p></div>
+    </div>
+    <div id="payment-action" class="payment-action" hidden></div>
+    <h2>Before you pay</h2>
+    <ul>
+      <li>Confirm the request and recipient independently.</li>
+      <li>Never share your UPI PIN, OTP, card PIN, or passwords with anyone.</li>
+      <li>Only proceed if a legitimate, secure payment link for this request is displayed and you trust the recipient.</li>
+      <li>HelpKaro23 does not guarantee a request's truth, funding, or refund.</li>
+    </ul>
+    <p class="disclaimer">This page is a front-end placeholder, not a payment gateway. To enable payments, add a verified payment link for the intended recipient to that request's entry in <code>requests.json</code>. Use a legitimate provider or recipient-owned payment link, and confirm applicable legal, tax, and provider requirements first.</p>
+    <p><a class="btn secondary" href="index.html#requests">Return to requests</a></p>
+  </section>
+</main>
+<footer class="footer">
+  <div class="footer-brand"><a class="brand" href="index.html"><img src="helpkaro23-logo.png" alt=""><span>HelpKaro<span class="mint">23</span><small>INDIA</small></span></a><p>Small help. Brighter tomorrows.</p></div>
+  <div class="footer-links"><a href="terms.html">Terms &amp; Conditions</a><a href="terms.html#privacy">Privacy Notice</a></div>
+  <div class="copyright">© <span id="year"></span> HelpKaro23 India · Independent community project</div>
+</footer>
+<script>
+document.getElementById("year").textContent = new Date().getFullYear();
+(async function () {
+  const params = new URLSearchParams(location.search);
+  const requestId = params.get("requestId") || "";
+  const amount = Number(params.get("amount"));
+  document.getElementById("payment-request-id").textContent = requestId || "Not provided";
+  document.getElementById("payment-amount").textContent =
+    Number.isFinite(amount) && amount > 0 && amount <= 10000 ? "₹" + amount.toLocaleString("en-IN") : "Not provided";
+  try {
+    const response = await fetch("./requests.json", {cache: "no-store"});
+    if (!response.ok) return;
+    const requests = await response.json();
+    if (!Array.isArray(requests)) return;
+    const request = requests.find(item =>
+      String(item.id || item.requestId || "") === requestId &&
+      item.approved === true &&
+      Number(item.amount) === amount
+    );
+    if (!request) {
+      document.getElementById("payment-status-title").textContent = "Request details could not be verified";
+      document.getElementById("payment-status").textContent =
+        "This request is not currently listed as approved, or its details do not match. Return to the request list and check again.";
+      return;
+    }
+    if (typeof request.paymentUrl === "string" && request.paymentUrl.trim()) {
+      const url = new URL(request.paymentUrl);
+      if (url.protocol === "https:") {
+        document.getElementById("payment-status-title").textContent = "Payment link available";
+        document.getElementById("payment-status").textContent =
+          "A payment link has been provided for this request. Confirm the recipient and amount before continuing.";
+        const action = document.getElementById("payment-action");
+        const link = document.createElement("a");
+        link.className = "btn primary";
+        link.href = url.href;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "Continue to payment provider ↗";
+        action.appendChild(link);
+        action.hidden = false;
+      }
+    }
+  } catch (error) {
+    console.warn("Could not verify payment details:", error);
+  }
+})();
+</script>
+</body>
+</html>
