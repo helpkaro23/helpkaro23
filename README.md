@@ -55,3 +55,7 @@ Add an `id` and `paymentUrl` to that request in `requests.json` only after verif
 ```
 
 Replace the example URL with a real HTTPS payment link owned by the intended recipient or a legitimate provider. The site itself does not collect or hold money. Do not publish a link until you have checked the recipient and the applicable provider/legal requirements.
+
+
+## Google Pay button (TEST mode only)
+`payment.html` now loads the Google Pay Web API script and renders a Donate button using `PaymentsClient({ environment: "TEST" })` and Google's example gateway tokenization configuration. This is a learning/demo flow only; it does not accept or settle real payments. Do not switch to production by merely changing the environment. Real payments require an approved merchant/payment-provider integration, production configuration, and secure payment-status verification. The Google Pay API's general card flow is not the same as the Google Pay for India UPI merchant integration.

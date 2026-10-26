@@ -11,3 +11,7 @@
 .payment-action{margin:20px 0}
 .payment-wrap code{color:var(--green2)}
 @media(max-width:600px){.payment-summary{grid-template-columns:1fr}}
+
+.google-pay-container{display:flex;align-items:center;justify-content:flex-start;min-height:52px;margin:16px 0}
+.google-pay-container button{max-width:100%}
+.gpay-message{min-height:1.5em;color:var(--muted);font-size:.9rem}

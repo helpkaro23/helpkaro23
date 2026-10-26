@@ -7,6 +7,7 @@
   <title>Payment / Support — HelpKaro23</title>
   <link rel="icon" href="helpkaro23-logo.png">
   <link rel="stylesheet" href="style.css">
+  <script async src="https://pay.google.com/gp/p/js/pay.js" onload="initGooglePay()"></script>
 </head>
 <body>
 <header class="topbar">
@@ -23,18 +24,29 @@
       <div><span class="payment-label">Request ID</span><strong id="payment-request-id">Not provided</strong></div>
       <div><span class="payment-label">Requested amount</span><strong id="payment-amount">Not provided</strong></div>
     </div>
-    <div class="notice payment-notice">
+
+    <div class="notice payment-notice" role="status" aria-live="polite">
       <span class="notice-icon">!</span>
-     
-    <div id="payment-action" class="payment-action" hidden></div>
-    <h2>Before you pay</h2>
+      <div>
+        <strong id="payment-status-title">Payment demo only</strong>
+        <p id="payment-status">Google Pay is configured in TEST mode for learning. This does not collect real money or confirm a donation.</p>
+      </div>
+    </div>
+
+    <h2>Google Pay demo</h2>
+    <p class="disclaimer">The button below uses Google's TEST environment and an example gateway. It is for learning the checkout interface only. Do not treat the demo response as a real payment.</p>
+    <div id="container" class="google-pay-container" aria-label="Google Pay demo button"></div>
+    <p id="gpay-message" class="gpay-message" aria-live="polite"></p>
+
+    <div class="payment-action" id="payment-action" hidden></div>
+    <h2>Before real payments can be enabled</h2>
     <ul>
-      <li>Confirm the request and recipient independently.</li>
+      <li>HelpKaro23 must have an approved merchant/payment-provider setup for its actual activity.</li>
+      <li>A real integration needs a supported payment processor and secure payment-status verification.</li>
+      <li>This static GitHub Pages demo cannot verify or settle transactions by itself.</li>
+      <li>Do not collect or redistribute money for third parties until the provider confirms that this model is permitted.</li>
       <li>Never share your UPI PIN, OTP, card PIN, or passwords with anyone.</li>
-      <li>Only proceed if a legitimate, secure payment link for this request is displayed and you trust the recipient.</li>
-      <li>HelpKaro23 does not guarantee a request's truth, funding, or refund.</li>
     </ul>
-    
     <p><a class="btn secondary" href="index.html#requests">Return to requests</a></p>
   </section>
 </main>
@@ -45,50 +57,127 @@
 </footer>
 <script>
 document.getElementById("year").textContent = new Date().getFullYear();
-(async function () {
+
+let googlePayClient;
+let selectedRequest = { requestId: "", amount: 0 };
+
+async function loadRequestDetails() {
   const params = new URLSearchParams(location.search);
   const requestId = params.get("requestId") || "";
   const amount = Number(params.get("amount"));
   document.getElementById("payment-request-id").textContent = requestId || "Not provided";
   document.getElementById("payment-amount").textContent =
-    Number.isFinite(amount) && amount > 0 && amount <= 10000 ? "₹" + amount.toLocaleString("en-IN") : "Not provided";
+    Number.isFinite(amount) && amount > 0 && amount <= 10000
+      ? "₹" + amount.toLocaleString("en-IN")
+      : "Not provided";
+
   try {
-    const response = await fetch("./requests.json", {cache: "no-store"});
-    if (!response.ok) return;
+    const response = await fetch("./requests.json", { cache: "no-store" });
+    if (!response.ok) throw new Error("Could not load requests.json");
     const requests = await response.json();
-    if (!Array.isArray(requests)) return;
+    if (!Array.isArray(requests)) throw new Error("Request data format is invalid");
+
     const request = requests.find(item =>
       String(item.id || item.requestId || "") === requestId &&
       item.approved === true &&
-      Number(item.amount) === amount
+      Number(item.amount) === amount &&
+      (!item.expiresAt || Date.parse(item.expiresAt) > Date.now())
     );
-    if (!request) {
+
+    if (!request || !Number.isFinite(amount) || amount <= 0 || amount > 10000) {
       document.getElementById("payment-status-title").textContent = "Request details could not be verified";
       document.getElementById("payment-status").textContent =
-        "This request is not currently listed as approved, or its details do not match. Return to the request list and check again.";
+        "This request is missing, expired, or not currently approved. The demo button is disabled.";
       return;
     }
-    if (typeof request.paymentUrl === "string" && request.paymentUrl.trim()) {
-      const url = new URL(request.paymentUrl);
-      if (url.protocol === "https:") {
-        document.getElementById("payment-status-title").textContent = "Payment link available";
-        document.getElementById("payment-status").textContent =
-          "A payment link has been provided for this request. Confirm the recipient and amount before continuing.";
-        const action = document.getElementById("payment-action");
-        const link = document.createElement("a");
-        link.className = "btn primary";
-        link.href = url.href;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.textContent = "Continue to payment provider ↗";
-        action.appendChild(link);
-        action.hidden = false;
-      }
-    }
+    selectedRequest = { requestId, amount };
   } catch (error) {
-    console.warn("Could not verify payment details:", error);
+    console.error(error);
+    document.getElementById("payment-status-title").textContent = "Request data unavailable";
+    document.getElementById("payment-status").textContent =
+      "We couldn't verify this request. Check requests.json and try again.";
   }
-})();
+}
+
+const baseCardPaymentMethod = {
+  type: "CARD",
+  parameters: {
+    allowedAuthMethods: ["PAN_ONLY", "CRYPTOGRAM_3DS"],
+    allowedCardNetworks: ["VISA", "MASTERCARD"]
+  },
+  tokenizationSpecification: {
+    type: "PAYMENT_GATEWAY",
+    parameters: {
+      gateway: "example",
+      gatewayMerchantId: "exampleGatewayMerchantId"
+    }
+  }
+};
+
+function initGooglePay() {
+  if (!window.google || !google.payments || !google.payments.api) {
+    document.getElementById("gpay-message").textContent =
+      "Google Pay could not load. Check your internet connection or try Chrome.";
+    return;
+  }
+
+  googlePayClient = new google.payments.api.PaymentsClient({ environment: "TEST" });
+  const button = googlePayClient.createButton({
+    buttonColor: "default",
+    buttonType: "donate",
+    buttonRadius: 4,
+    buttonBorderType: "default_border",
+    onClick: onGooglePayClick,
+    allowedPaymentMethods: [baseCardPaymentMethod]
+  });
+
+  document.getElementById("container").replaceChildren(button);
+  loadRequestDetails().then(() => {
+    if (!selectedRequest.requestId || !selectedRequest.amount) {
+      button.disabled = true;
+      button.style.opacity = "0.45";
+      button.style.cursor = "not-allowed";
+    }
+  });
+}
+
+async function onGooglePayClick() {
+  const message = document.getElementById("gpay-message");
+  if (!selectedRequest.requestId || !selectedRequest.amount) {
+    message.textContent = "No valid approved request is selected.";
+    return;
+  }
+
+  const paymentDataRequest = {
+    apiVersion: 2,
+    apiVersionMinor: 0,
+    allowedPaymentMethods: [baseCardPaymentMethod],
+    merchantInfo: { merchantName: "HelpKaro23 Demo" },
+    transactionInfo: {
+      totalPriceStatus: "FINAL",
+      totalPrice: selectedRequest.amount.toFixed(2),
+      currencyCode: "INR",
+      countryCode: "IN"
+    }
+  };
+
+  try {
+    await googlePayClient.loadPaymentData(paymentDataRequest);
+    message.textContent =
+      "Google Pay returned a TEST response only. No real money was collected and no donation was confirmed.";
+    document.getElementById("payment-status-title").textContent = "Test checkout completed";
+    document.getElementById("payment-status").textContent =
+      "This was a Google Pay TEST-mode flow. Do not interpret it as a real payment.";
+  } catch (error) {
+    console.warn("Google Pay demo flow:", error);
+    if (error.statusCode === "CANCELED") {
+      message.textContent = "Demo checkout was cancelled.";
+    } else {
+      message.textContent =
+        "The test checkout could not be completed in this browser/account. This demo does not accept real payments.";
+    }
+  }
+}
 </script>
 </body>
 </html>
